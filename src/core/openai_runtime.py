@@ -1,7 +1,7 @@
 """
 OpenAI SDK runtime — dùng cho:
 
-  Blue Team → OpenRouter liquid/lfm-3-1.7b:free (create_blue_pair)
+  Blue Team → Liquid API lfm3-1.7b (create_blue_pair)
   Red Team  → OpenAI gpt-4o-mini (create_openai_pair) khi RED_TEAM_PROVIDER=openai
 
 Gemini Red Team dùng Google ADK trong agents/*.py — không đi qua file này.
@@ -42,6 +42,7 @@ class OpenAIRunner:
     plugins: list = field(default_factory=list)
     provider: str = "openai"
     temperature: float = 0.4
+    extra_body: dict = field(default_factory=dict)
     client_kwargs: dict = field(default_factory=dict)
     input_hooks: list[Callable[[str], str | None]] = field(default_factory=list)
     output_hooks: list[Callable[[str], str]] = field(default_factory=list)
@@ -62,13 +63,18 @@ class OpenAIRunner:
             return block_msg
 
         client = self._client()
-        completion = client.chat.completions.create(
-            model=self.model,
-            messages=[
+        request = {
+            "model": self.model,
+            "messages": [
                 {"role": "system", "content": agent.instruction},
                 {"role": "user", "content": user_message},
             ],
-            temperature=self.temperature,
+            "temperature": self.temperature,
+        }
+        if self.extra_body:
+            request["extra_body"] = self.extra_body
+        completion = client.chat.completions.create(
+            **request,
         )
         text = (completion.choices[0].message.content or "").strip()
 
@@ -166,6 +172,7 @@ def _make_pair(
     input_hooks: list | None = None,
     output_hooks: list | None = None,
     temperature: float = 0.4,
+    extra_body: dict | None = None,
 ) -> tuple[OpenAIAgent, OpenAIRunner]:
     agent = OpenAIAgent(name=name, instruction=instruction, provider=provider)
     runner = OpenAIRunner(
@@ -177,6 +184,7 @@ def _make_pair(
         input_hooks=list(input_hooks or []),
         output_hooks=list(output_hooks or []),
         temperature=temperature,
+        extra_body=dict(extra_body or {}),
     )
     return agent, runner
 
@@ -191,7 +199,7 @@ def create_blue_pair(
     output_hooks: list | None = None,
     temperature: float = 0.4,
 ) -> tuple[OpenAIAgent, OpenAIRunner]:
-    """Blue Team — always OpenRouter liquid/lfm-3-1.7b:free."""
+    """Blue Team — always Liquid API lfm3-1.7b."""
     return _make_pair(
         name=name,
         instruction=instruction,
@@ -203,6 +211,7 @@ def create_blue_pair(
         input_hooks=input_hooks,
         output_hooks=output_hooks,
         temperature=temperature,
+        extra_body={"top_k": 50, "repetition_penalty": 1.1},
     )
 
 

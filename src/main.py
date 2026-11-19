@@ -19,6 +19,15 @@ import asyncio
 import sys
 from pathlib import Path
 
+# Windows terminals can inherit a legacy code page (for example CP1252), while
+# the lab's status messages contain Vietnamese and arrows. Keep CLI output from
+# crashing before a checkpoint starts; tests that replace the streams are left
+# untouched when ``reconfigure`` is unavailable.
+for _stream in (sys.stdout, sys.stderr):
+    _reconfigure = getattr(_stream, "reconfigure", None)
+    if _reconfigure is not None:
+        _reconfigure(encoding="utf-8", errors="replace")
+
 # Cho phép chạy ``python src/main.py`` từ gốc repo
 _SRC_DIR = Path(__file__).resolve().parent
 if str(_SRC_DIR) not in sys.path:
